@@ -1,0 +1,79 @@
+# One command to get a fully working ShadowChat: `docker compose up --build`
+# App on http://localhost:3000, Postgres on localhost:5433.
+#
+# Credentials come from the environment (or .env). The `:-shadowchat` defaults
+# exist only so a local checkout runs without setup -- always set real values
+# in any shared or deployed environment.
+#
+# PRODUCTION WARNING: the app service runs with NODE_ENV=production. If the
+# effective database password is still the development default `shadowchat`,
+# the server refuses to start (see assertProductionCredentials in
+# server/config.mjs) instead of silently exposing a database whose password is
+# published in this repository. Set POSTGRES_PASSWORD (and DATABASE_URL if you
+# override it) before deploying.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-shadowchat}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shadowchat}
+      POSTGRES_DB: ${POSTGRES_DB:-shadowchat}
+    ports:
+      - '${POSTGRES_PORT:-5433}:5432'
+    volumes:
+      - shadowchat-db:/var/lib/postgresql/data
+    healthcheck:
+      # The app refuses to boot without a reachable database, so wait for it.
+      test:
+        - CMD-SHELL
+        - >-
+          pg_isready -U ${POSTGRES_USER:-shadowchat}
+          -d ${POSTGRES_DB:-shadowchat}
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATABASE_URL: >-
+        postgres://${POSTGRES_USER:-shadowchat}:${POSTGRES_PASSWORD:-shadowchat}@db:5432/${POSTGRES_DB:-shadowchat}
+      # Join flood protection (process-local, single instance).
+      JOIN_ATTEMPTS_PER_WINDOW: ${JOIN_ATTEMPTS_PER_WINDOW:-10}
+      JOIN_RATE_WINDOW_MS: ${JOIN_RATE_WINDOW_MS:-60000}
+      # Per-IP message flood protection (process-local, single instance).
+      MESSAGE_IP_RATE: ${MESSAGE_IP_RATE:-60}
+      MESSAGE_IP_WINDOW_MS: ${MESSAGE_IP_WINDOW_MS:-10000}
+      # Bounded retry for write-behind persistence.
+      WRITE_MAX_ATTEMPTS: ${WRITE_MAX_ATTEMPTS:-3}
+      WRITE_RETRY_BASE_MS: ${WRITE_RETRY_BASE_MS:-250}
+      # How often expired rooms are swept out of Postgres.
+      SWEEP_INTERVAL_MS: ${SWEEP_INTERVAL_MS:-300000}
+      # Only enable when a trusted reverse proxy sets X-Forwarded-For.
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+    ports:
+      - '${PORT:-3000}:3000'
+    healthcheck:
+      # Block sequence: the inline script contains quotes and parentheses that
+      # flow-style YAML cannot hold.
+      test:
+        - CMD-SHELL
+        - >-
+          node -e "fetch('http://127.0.0.1:3000/healthz')
+          .then(r => process.exit(r.ok ? 0 : 1))
+          .catch(() => process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  shadowchat-db:
