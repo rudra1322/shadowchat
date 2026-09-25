@@ -196,6 +196,10 @@ await check('a failing database does not break the room', async () => {
   await flushPersistence()
 
   assert.ok(persistenceStats().errors > before, 'the error should be counted')
+  assert.ok(
+    persistenceStats().dropped > 0,
+    'the failed write should eventually be dropped after retries',
+  )
   assert.equal(getRoom('S0N2V5H8').messages.at(-1).text, 'still delivered')
   leaveRoom('S0N2V5H8', 'sock-fail')
   configurePersistence({ query: fakeQuery })

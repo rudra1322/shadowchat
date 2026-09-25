@@ -1,5 +1,5 @@
 # One command to get a fully working ShadowChat: `docker compose up --build`
-# App on http://localhost:3000, Postgres on localhost:5433.
+# App on http://localhost:3001, Postgres on localhost:5433.
 #
 # Credentials come from the environment (or .env). The `:-shadowchat` defaults
 # exist only so a local checkout runs without setup -- always set real values
@@ -45,23 +45,33 @@ services:
       NODE_ENV: production
       PORT: 3000
       HOST: 0.0.0.0
+      SOCKET_ORIGIN: ${SOCKET_ORIGIN:-http://localhost:3000}
       DATABASE_URL: >-
         postgres://${POSTGRES_USER:-shadowchat}:${POSTGRES_PASSWORD:-shadowchat}@db:5432/${POSTGRES_DB:-shadowchat}
+
       # Join flood protection (process-local, single instance).
       JOIN_ATTEMPTS_PER_WINDOW: ${JOIN_ATTEMPTS_PER_WINDOW:-10}
       JOIN_RATE_WINDOW_MS: ${JOIN_RATE_WINDOW_MS:-60000}
+
       # Per-IP message flood protection (process-local, single instance).
       MESSAGE_IP_RATE: ${MESSAGE_IP_RATE:-60}
       MESSAGE_IP_WINDOW_MS: ${MESSAGE_IP_WINDOW_MS:-10000}
+
       # Bounded retry for write-behind persistence.
       WRITE_MAX_ATTEMPTS: ${WRITE_MAX_ATTEMPTS:-3}
       WRITE_RETRY_BASE_MS: ${WRITE_RETRY_BASE_MS:-250}
+
       # How often expired rooms are swept out of Postgres.
       SWEEP_INTERVAL_MS: ${SWEEP_INTERVAL_MS:-300000}
+
       # Only enable when a trusted reverse proxy sets X-Forwarded-For.
       TRUST_PROXY: ${TRUST_PROXY:-false}
+
+    # Host port 3001 -> container port 3000.
+    # BlackMafia uses host port 3000.
     ports:
-      - '${PORT:-3000}:3000'
+      - '${SHADOWCHAT_PORT:-3001}:3000'
+
     healthcheck:
       # Block sequence: the inline script contains quotes and parentheses that
       # flow-style YAML cannot hold.

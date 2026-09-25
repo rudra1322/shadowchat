@@ -11,6 +11,7 @@ import {
   recordRoomActivity,
   recordRoomClosed,
   clearRoomMessages,
+  recordActivity,
 } from './persistence.mjs'
 import { ROOM } from './config.mjs'
 import { generateUniqueRoomCode, isValidRoomCode } from './roomCode.mjs'
@@ -81,8 +82,11 @@ function createRoom(code) {
     reaper: null,
   }
   rooms.set(code, room)
-  recordRoomActivity(code)
-  return room
+recordRoomActivity(code)
+recordActivity('ROOM_CREATED', {
+  roomCode: code,
+})
+return room
 }
 
 /**
@@ -110,7 +114,10 @@ function scheduleReaper(code, room) {
     const current = rooms.get(code)
     if (current && current.members.size === 0) {
       rooms.delete(code)
-      recordRoomClosed(code)
+recordRoomClosed(code)
+recordActivity('ROOM_EXPIRED', {
+  roomCode: code,
+})
     }
   }, EMPTY_ROOM_TTL_MS)
   if (typeof room.reaper.unref === 'function') room.reaper.unref()
@@ -145,6 +152,10 @@ export function joinRoom(code, socketId, username) {
   }
 
   room.members.set(socketId, { id: socketId, username: handle, joinedAt: Date.now() })
+  recordActivity('USER_JOINED', {
+    roomCode: code,
+    username: handle,
+  })
   return { ok: true, room, username: handle }
 }
 
@@ -214,6 +225,12 @@ export function pushMessage(code, message) {
     room.messages.splice(0, room.messages.length - MAX_MESSAGES_PER_ROOM)
   }
   recordMessage(code, message)
+  if (message.kind === 'chat') {
+    recordActivity('MESSAGE_SENT', {
+      roomCode: code,
+      username: message.username,
+    })
+  }
   return message
 }
 
@@ -246,7 +263,19 @@ export function listMembers(code) {
 }
 
 export function roomStats() {
-  return { rooms: rooms.size }
+  let onlineUsers = 0
+  let messages = 0
+
+  for (const room of rooms.values()) {
+    onlineUsers += room.members.size
+    messages += room.messages.length
+  }
+
+  return {
+    rooms: rooms.size,
+    onlineUsers,
+    messages,
+  }
 }
 
 export const ROOM_LIMITS = {

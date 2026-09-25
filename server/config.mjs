@@ -53,7 +53,7 @@ export const MESSAGE_RATE = {
  */
 export const MESSAGE_IP_RATE = {
   WINDOW_MS: int('MESSAGE_IP_WINDOW_MS', 10_000),
-  MAX: int('MESSAGE_IP_RATE', 60),
+  MAX: int('MESSAGE_IP_RATE', 3),
 }
 
 export const JOIN_RATE = {

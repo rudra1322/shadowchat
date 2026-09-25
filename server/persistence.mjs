@@ -103,7 +103,17 @@ function enqueue(label, run) {
           )
           if (attempt === attempts) {
             stats.dropped += 1
-            console.error(`[shadowchat:db] ${label} dropped after ${attempts} attempts`)
+          
+            console.error(
+              `[shadowchat:db] ${label} dropped after ${attempts} attempts`,
+            )
+          
+            // Record the failure without attempting another database write.
+            console.error(
+              '[shadowchat:security] PERSISTENCE_FAILURE',
+              { operation: label },
+            )
+          
             return
           }
           stats.retries += 1
@@ -147,6 +157,117 @@ export function recordRoomActivity(code, { force = true } = {}) {
     ),
   )
   return true
+}
+
+export function recordActivity(
+  event,
+  { roomCode = null, username = null } = {},
+) {
+  if (!enabled) return false
+
+  enqueue('activity log insert', () =>
+    queryFn(
+      `INSERT INTO activity_logs (
+         event,
+         room_code,
+         username
+       )
+       VALUES ($1, $2, $3)`,
+      [
+        event,
+        roomCode,
+        username,
+      ],
+    ),
+  )
+
+  return true
+}
+
+export function recordSecurityEvent(
+  event,
+  {
+    roomCode = null,
+    username = null,
+    ipKey = null,
+    details = null,
+  } = {},
+) {
+  if (!enabled) return false
+
+  enqueue('security event insert', () =>
+    queryFn(
+      `INSERT INTO security_events (
+         event,
+         room_code,
+         username,
+         ip_key,
+         details
+       )
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        event,
+        roomCode,
+        username,
+        ipKey,
+        details,
+      ],
+    ),
+  )
+
+  return true
+}
+
+export async function getRecentSecurityEvents(
+  limit = 25,
+) {
+  if (!enabled) return []
+
+  const safeLimit = Math.min(
+    Math.max(Number(limit) || 25, 1),
+    100,
+  )
+
+  const result = await queryFn(
+    `SELECT
+       id,
+       event,
+       room_code,
+       username,
+       ip_key,
+       details,
+       created_at
+     FROM security_events
+     ORDER BY created_at DESC
+     LIMIT $1`,
+    [safeLimit],
+  )
+
+  return result.rows
+}
+
+export async function getRecentActivity(limit = 25) {
+  if (!enabled) return []
+
+  const safeLimit = Math.min(
+    Math.max(Number(limit) || 25, 1),
+    100,
+  )
+
+  const result = await queryFn(
+    `SELECT
+       id,
+       event,
+       room_code,
+       username,
+       created_at
+     FROM activity_logs
+     ORDER BY created_at DESC
+     LIMIT $1`,
+    [safeLimit],
+  )
+
+  return result.rows
 }
 
 export function recordMessage(code, message) {

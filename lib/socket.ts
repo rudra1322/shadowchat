@@ -7,7 +7,7 @@ export function getSocket(): Socket {
   if (!socket) {
     socket = io({
       path: '/socket',
-      transports: ['websocket', 'polling'],
+      transports: ['polling'],
       autoConnect: false,
       reconnectionAttempts: 8,
       reconnectionDelay: 700,
