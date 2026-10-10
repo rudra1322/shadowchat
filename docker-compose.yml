@@ -17,11 +17,11 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-shadowchat}
+      POSTGRES_USER:  ${POSTGRES_USER:-shadowchat}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shadowchat}
       POSTGRES_DB: ${POSTGRES_DB:-shadowchat}
     ports:
-      - '${POSTGRES_PORT:-5433}:5432'
+       - '${POSTGRES_PORT:-5433}:5432'
     volumes:
       - shadowchat-db:/var/lib/postgresql/data
     healthcheck:
@@ -45,9 +45,9 @@ services:
       NODE_ENV: production
       PORT: 3000
       HOST: 0.0.0.0
-      SOCKET_ORIGIN: ${SOCKET_ORIGIN:-http://localhost:3000}
+      SOCKET_ORIGIN: ${SOCKET_ORIGIN:-http://localhost:3001}
       DATABASE_URL: >-
-        postgres://${POSTGRES_USER:-shadowchat}:${POSTGRES_PASSWORD:-shadowchat}@db:5432/${POSTGRES_DB:-shadowchat}
+         ${DATABASE_URL:-postgres://${POSTGRES_USER:-shadowchat}:${POSTGRES_PASSWORD:-shadowchat}@db:5432/${POSTGRES_DB:-shadowchat}}
 
       # Join flood protection (process-local, single instance).
       JOIN_ATTEMPTS_PER_WINDOW: ${JOIN_ATTEMPTS_PER_WINDOW:-10}

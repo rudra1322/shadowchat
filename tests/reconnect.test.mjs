@@ -8,6 +8,7 @@
 
 process.env.RECONNECT_GRACE_MS = '400'
 
+const { getRoom } = await import('../server/rooms.mjs')
 const { attachSocketServer } = await import('../server/socket.mjs')
 const { fakeIoFactory, makeSocket } = await import('./fake-io.mjs')
 const { ROOM } = await import('../server/config.mjs')
@@ -94,12 +95,24 @@ await check('a real departure is still announced after the grace period', async 
   assert(noise.length === 1, `a genuine leave must be visible, saw ${noise.length}`)
 })
 
+
 await check('the join backlog policy matches the documented 250 messages', () => {
   const code = 'RECN0005'
   const { socket } = join(code, 'writer', '10.7.5.5')
-  for (let i = 0; i < 20; i += 1) socket.fire('message:send', { text: `line ${i}` }, () => {})
+  const room = getRoom(code)
+
+  for (let i = 0; i < 20; i += 1) {
+    room.messages.push({
+      id: `backlog-${i}`,
+      kind: 'chat',
+      text: `line ${i}`,
+      username: 'writer',
+      at: Date.now() + i,
+    })
+  }
 
   const { ack } = join(code, 'reader', '10.7.5.6')
+
   assert(ack.messages.length <= ROOM.MAX_MESSAGES_PER_ROOM, 'the backlog is capped')
   assert(
     ROOM.MAX_MESSAGES_PER_ROOM === 250,

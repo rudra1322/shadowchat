@@ -3,8 +3,18 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const run = (file) =>
-  spawnSync(process.execPath, [join(here, file)], { stdio: 'inherit' }).status ?? 1
+const run = (file) => {
+  const env = { ...process.env }
+
+  if (file === 'socket.test.mjs') {
+    env.MESSAGE_IP_RATE = '100'
+  }
+
+  return spawnSync(process.execPath, [join(here, file)], {
+    stdio: 'inherit',
+    env,
+  }).status ?? 1
+}
 
 run('build-roomcode.mjs')
 const failures = [

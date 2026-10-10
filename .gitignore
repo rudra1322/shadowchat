@@ -15,3 +15,7 @@ tests/*.build.mjs
 # Misc
 .DS_Store
 *.log
+
+.env.local-backup
+*.backup
+verify-db.mjs

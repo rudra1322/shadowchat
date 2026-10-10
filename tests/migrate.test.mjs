@@ -65,7 +65,9 @@ const clientSql = (pool) => pool.state.clientQueries.map((q) => q.sql)
 console.log('\nmigrations')
 
 await check('a successful migration commits on one dedicated client', async () => {
-  const pool = makePool()
+  const pool = makePool({
+  appliedNames: ['001_init.sql', '002_activity_logs.sql'],
+})
   setPool(pool)
   const result = await migrate({ log: () => {} })
 
@@ -74,7 +76,7 @@ await check('a successful migration commits on one dedicated client', async () =
   assert(sql[0] === 'BEGIN', `first statement should be BEGIN, got ${sql[0]}`)
   assert(sql.at(-1) === 'COMMIT', `last statement should be COMMIT, got ${sql.at(-1)}`)
   assert(!sql.includes('ROLLBACK'), 'a successful migration must not roll back')
-  assert(result.applied >= 1, 'at least one migration file should have been applied')
+  assert(result.applied === 1, 'exactly one pending migration should be applied')
 })
 
 await check('the migration and its schema_migrations row share one transaction', async () => {
@@ -145,7 +147,13 @@ await check('the client is released on success and on failure', async () => {
 })
 
 await check('already-applied migrations are skipped', async () => {
-  const pool = makePool({ appliedNames: ['001_init.sql'] })
+  const pool = makePool({
+  appliedNames: [
+    '001_init.sql',
+    '002_activity_logs.sql',
+    '003_security_events.sql',
+  ],
+})
   setPool(pool)
   const result = await migrate({ log: () => {} })
   assert(result.applied === 0, 'a recorded migration must not run twice')

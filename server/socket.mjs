@@ -60,14 +60,6 @@ function createRateLimiter({ windowMs, max }) {
         (t) => now - t < windowMs,
       )
 
-      // Temporary security-test diagnostics.
-      console.log('[security-test] RATE_LIMIT_CHECK', {
-        key,
-        max,
-        windowMs,
-        recentCount: recent.length,
-      })
-
       // Opportunistic cleanup so idle keys do not accumulate forever.
       if (attempts.size > 5_000) {
         for (const [existing, stamps] of attempts) {
@@ -83,13 +75,6 @@ function createRateLimiter({ windowMs, max }) {
 
       if (recent.length >= max) {
         attempts.set(key, recent)
-
-        console.log('[security-test] RATE_LIMIT_BLOCKED', {
-          key,
-          max,
-          windowMs,
-          recentCount: recent.length,
-        })
 
         return false
       }
@@ -158,7 +143,7 @@ export function attachSocketServer(
             'Socket connection error',
         },
       )
-  
+
       recordSecurityEvent(
         'CONNECTION_ERROR',
         {
@@ -181,14 +166,8 @@ export function attachSocketServer(
     max: MESSAGE_IP_RATE.MAX,
   })
 
-  // Temporary startup diagnostic.
-  console.log('[security-test] JOIN_LIMITER_CONFIG', {
-    max: JOIN_RATE.MAX,
-    windowMs: JOIN_RATE.WINDOW_MS,
-  })
-
   io.on('connection', (socket) => {
-    
+
     // Per-connection session state.
     // Never trust client-sent identity later.
     const session = {
@@ -235,7 +214,6 @@ export function attachSocketServer(
     // ------------------------------------------------------------
 
     socket.on('room:create', (_payload, ack) => {
-      console.log('[security-test] ROOM_CREATE_RECEIVED')
 
       const respond =
         typeof ack === 'function'
@@ -245,27 +223,9 @@ export function attachSocketServer(
       // Creating a room costs a join attempt.
       const key = clientKey(socket)
 
-      console.log('[security-test] CREATE_RATE_STATE', {
-        key,
-        max: JOIN_RATE.MAX,
-        windowMs: JOIN_RATE.WINDOW_MS,
-      })
-
       const allowed = joinLimiter.take(key)
 
-      console.log('[security-test] CREATE_RATE_RESULT', {
-        key,
-        allowed,
-      })
-
       if (!allowed) {
-        console.log(
-          '[security-test] JOIN_RATE_LIMITED',
-          {
-            ipKey: key,
-            source: 'room:create',
-          },
-        )
 
         recordSecurityEvent(
           'JOIN_RATE_LIMITED',
@@ -334,13 +294,6 @@ export function attachSocketServer(
       const allowed = joinLimiter.take(key)
 
       if (!allowed) {
-        console.log(
-          '[security-test] JOIN_RATE_LIMITED',
-          {
-            ipKey: key,
-            source: 'room:join',
-          },
-        )
 
         recordSecurityEvent(
           'JOIN_RATE_LIMITED',
@@ -375,12 +328,7 @@ export function attachSocketServer(
       )
 
       if (!isValidCode(code)) {
-        console.log('[security-test] INVALID_ROOM_CODE', {
-          code,
-          username,
-          ipKey: key,
-        })
-      
+
         recordSecurityEvent(
           'INVALID_ROOM_CODE',
           {
@@ -390,16 +338,16 @@ export function attachSocketServer(
             details: 'Invalid room code format',
           },
         )
-      
+
         respond({
           ok: false,
           error: 'INVALID_CODE',
         })
-      
+
         socket.emit('room:error', {
           error: 'INVALID_CODE',
         })
-      
+
         return
       }
 
@@ -512,14 +460,7 @@ export function attachSocketServer(
       const key = clientKey(socket)
 
       if (!messageIpLimiter.take(key)) {
-        console.log(
-          '[security-test] MESSAGE_RATE_LIMITED',
-          {
-            roomCode: session.code,
-            username: session.username,
-            ipKey: key,
-          },
-        )
+
 
         recordSecurityEvent(
           'MESSAGE_RATE_LIMITED',
